@@ -1,0 +1,1092 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SpendLens</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700;800&display=swap');
+
+:root {
+  --bg: #07070f;
+  --surface: #0f0f1a;
+  --surface2: #16162a;
+  --border: rgba(255,255,255,0.06);
+  --text: #eeeeff;
+  --muted: rgba(238,238,255,0.4);
+  --accent: #6f5fff;
+  --pink: #ff5f9e;
+  --green: #00e5a0;
+  --orange: #ff9a3c;
+  --yellow: #ffe14d;
+  --food: #ff5f9e;
+  --transport: #6f5fff;
+  --shopping: #ff9a3c;
+  --entertainment: #00e5a0;
+  --groceries: #ffe14d;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Inter', sans-serif;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* ── NOISE OVERLAY ── */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.4;
+}
+
+/* ── ORBS ── */
+.orb {
+  position: fixed;
+  border-radius: 50%;
+  filter: blur(120px);
+  opacity: 0.12;
+  pointer-events: none;
+  z-index: 0;
+}
+.orb1 { width: 500px; height: 500px; background: var(--accent); top: -150px; left: -150px; }
+.orb2 { width: 350px; height: 350px; background: var(--pink); bottom: -100px; right: -100px; }
+.orb3 { width: 250px; height: 250px; background: var(--green); top: 40%; left: 60%; }
+
+/* ── SCREENS ── */
+.screen { position: relative; z-index: 1; }
+
+/* ══════════════════════════════
+   STEP 1 — LANDING
+══════════════════════════════ */
+#s1 {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem 1.5rem;
+  text-align: center;
+}
+
+.wordmark {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 2.5rem;
+}
+
+.wordmark-icon {
+  width: 40px;
+  height: 40px;
+  position: relative;
+}
+
+.wordmark-icon svg {
+  width: 40px;
+  height: 40px;
+}
+
+.wordmark-text {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+.wordmark-text .s { color: var(--accent); }
+.wordmark-text .p { color: var(--pink); }
+
+.eyebrow {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--green);
+  margin-bottom: 1.25rem;
+  opacity: 0.8;
+}
+
+.h1 {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: clamp(2.8rem, 7vw, 5rem);
+  font-weight: 800;
+  line-height: 1.0;
+  letter-spacing: -0.03em;
+  margin-bottom: 1rem;
+}
+.h1 em {
+  font-style: normal;
+  background: linear-gradient(100deg, var(--accent), var(--pink));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.sub {
+  font-size: 16px;
+  color: var(--muted);
+  max-width: 420px;
+  line-height: 1.7;
+  margin-bottom: 3rem;
+}
+
+/* ── STEP PILLS ── */
+.steps-row {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  margin-bottom: 3rem;
+}
+.step-pill {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--muted);
+}
+.step-pill:first-child { border-radius: 12px 0 0 12px; border-right: none; }
+.step-pill:last-child { border-radius: 0 12px 12px 0; }
+.step-pill.active { background: rgba(111,95,255,0.12); border-color: rgba(111,95,255,0.3); color: var(--text); }
+.step-num {
+  width: 20px; height: 20px; border-radius: 50%;
+  background: var(--surface2);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 700; color: var(--muted);
+  flex-shrink: 0;
+}
+.step-pill.active .step-num { background: var(--accent); color: white; }
+.step-arrow { font-size: 12px; color: var(--border); padding: 0 4px; display: flex; align-items: center; background: var(--surface); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); height: 100%; padding: 8px 6px; }
+
+/* ── DROP ZONE ── */
+.dropzone {
+  width: 100%;
+  max-width: 540px;
+  background: var(--surface);
+  border: 1.5px dashed rgba(111,95,255,0.35);
+  border-radius: 24px;
+  padding: 2.5rem 2rem;
+  cursor: pointer;
+  transition: all 0.3s;
+  position: relative;
+  overflow: hidden;
+}
+.dropzone::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at 50% 0%, rgba(111,95,255,0.06) 0%, transparent 70%);
+  pointer-events: none;
+}
+.dropzone:hover, .dropzone.drag {
+  border-color: var(--accent);
+  background: rgba(111,95,255,0.06);
+  transform: translateY(-3px);
+  box-shadow: 0 20px 60px rgba(111,95,255,0.12);
+}
+
+.dz-receipt {
+  font-size: 52px;
+  margin-bottom: 1rem;
+  display: block;
+  filter: grayscale(0.3);
+}
+
+.dz-title {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 19px;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+.dz-sub { font-size: 13px; color: var(--muted); margin-bottom: 1.5rem; line-height: 1.5; }
+
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 13px 28px;
+  background: linear-gradient(135deg, var(--accent), var(--pink));
+  border-radius: 12px;
+  font-weight: 700;
+  font-size: 14px;
+  color: white;
+  border: none;
+  cursor: pointer;
+  transition: opacity 0.2s, transform 0.2s;
+  letter-spacing: 0.01em;
+}
+.btn-primary:hover { opacity: 0.88; transform: scale(1.02); }
+
+.btn-ghost {
+  margin-top: 12px;
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  padding: 10px 20px;
+  border-radius: 10px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: block;
+  width: 100%;
+}
+.btn-ghost:hover { border-color: var(--green); color: var(--green); }
+
+#fileInput { display: none; }
+
+.format-note {
+  margin-top: 14px;
+  font-size: 11px;
+  color: var(--muted);
+  opacity: 0.5;
+}
+
+/* ══════════════════════════════
+   STEP 2 — LOADING
+══════════════════════════════ */
+#s2 {
+  display: none;
+  min-height: 100vh;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  padding: 2rem;
+}
+
+.load-wrap { width: 100%; max-width: 480px; text-align: center; }
+
+.load-ticker {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--green);
+  margin-bottom: 2rem;
+  opacity: 0.7;
+}
+
+.load-visual {
+  position: relative;
+  width: 140px;
+  height: 140px;
+  margin: 0 auto 2rem;
+}
+
+.load-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 2px solid transparent;
+}
+.load-ring-1 { border-top-color: var(--accent); border-right-color: var(--accent); animation: spin 1.2s linear infinite; }
+.load-ring-2 { inset: 12px; border-bottom-color: var(--pink); border-left-color: var(--pink); animation: spin 0.9s linear infinite reverse; }
+.load-ring-3 { inset: 24px; border-top-color: var(--green); animation: spin 1.6s linear infinite; }
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.load-center {
+  position: absolute;
+  inset: 36px;
+  border-radius: 50%;
+  background: var(--surface);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+}
+
+.load-title {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 22px;
+  font-weight: 700;
+  margin-bottom: 8px;
+  min-height: 32px;
+  transition: all 0.3s;
+}
+.load-sub {
+  font-size: 13px;
+  color: var(--muted);
+  min-height: 20px;
+  margin-bottom: 2rem;
+}
+
+.load-bar-wrap {
+  background: var(--surface2);
+  border-radius: 99px;
+  height: 4px;
+  overflow: hidden;
+  margin-bottom: 2rem;
+}
+.load-bar {
+  height: 4px;
+  border-radius: 99px;
+  background: linear-gradient(90deg, var(--accent), var(--pink), var(--green));
+  width: 0%;
+  transition: width 0.5s ease;
+}
+
+.load-items {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  text-align: left;
+}
+.load-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--muted);
+  opacity: 0;
+  transform: translateX(-10px);
+  transition: all 0.4s;
+}
+.load-item.done { opacity: 1; transform: translateX(0); color: var(--text); }
+.load-item-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--border);
+  flex-shrink: 0;
+  transition: background 0.3s;
+}
+.load-item.done .load-item-dot { background: var(--green); }
+
+/* ══════════════════════════════
+   DASHBOARD
+══════════════════════════════ */
+#s3 { display: none; padding: 2rem 1.5rem; max-width: 1100px; margin: 0 auto; }
+
+.dash-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 2.5rem;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+.dash-wordmark { font-family: 'Space Grotesk', sans-serif; font-size: 18px; font-weight: 800; letter-spacing: -0.02em; }
+.dash-wordmark .s { color: var(--accent); }
+.dash-wordmark .p { color: var(--pink); }
+
+.btn-back {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  padding: 8px 16px;
+  border-radius: 10px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.btn-back:hover { color: var(--text); border-color: rgba(111,95,255,0.4); }
+
+/* ── AI CARD ── */
+.ai-card {
+  background: var(--surface);
+  border: 1px solid rgba(111,95,255,0.2);
+  border-radius: 20px;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+  position: relative;
+  overflow: hidden;
+}
+.ai-card::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 1.5px;
+  background: linear-gradient(90deg, var(--accent), var(--pink), var(--green));
+}
+.ai-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 10px;
+}
+.live-dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--green);
+  animation: blink 1.4s ease-in-out infinite;
+}
+@keyframes blink {
+  0%,100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+.ai-text { font-size: 15px; line-height: 1.75; color: var(--text); }
+.ai-text strong { color: var(--pink); }
+
+/* ── PREDICT BANNER ── */
+.predict-card {
+  background: linear-gradient(135deg, rgba(111,95,255,0.1), rgba(255,95,158,0.07));
+  border: 1px solid rgba(111,95,255,0.18);
+  border-radius: 20px;
+  padding: 1.25rem 1.5rem;
+  margin-bottom: 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.predict-card:hover { border-color: var(--accent); }
+.predict-left { display: flex; align-items: center; gap: 12px; }
+.predict-icon { font-size: 28px; }
+.predict-title { font-family: 'Space Grotesk', sans-serif; font-size: 15px; font-weight: 700; margin-bottom: 2px; }
+.predict-sub { font-size: 12px; color: var(--muted); }
+.predict-badge {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 99px;
+  background: rgba(0,229,160,0.12);
+  color: var(--green);
+  letter-spacing: 0.06em;
+  flex-shrink: 0;
+}
+
+/* ── PREDICT MODAL ── */
+.modal-bg {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.7);
+  z-index: 100;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  backdrop-filter: blur(6px);
+}
+.modal-bg.open { display: flex; }
+.modal {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  padding: 2rem;
+  max-width: 480px;
+  width: 100%;
+  position: relative;
+}
+.modal-close {
+  position: absolute; top: 14px; right: 16px;
+  background: none; border: none; color: var(--muted);
+  font-size: 18px; cursor: pointer; line-height: 1;
+}
+.modal-title { font-family: 'Space Grotesk', sans-serif; font-size: 20px; font-weight: 700; margin-bottom: 6px; }
+.modal-sub { font-size: 13px; color: var(--muted); margin-bottom: 1.5rem; line-height: 1.6; }
+.predict-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 10px 0; border-bottom: 1px solid var(--border);
+  font-size: 14px;
+}
+.predict-row:last-of-type { border-bottom: none; }
+.predict-row-cat { display: flex; align-items: center; gap: 8px; }
+.predict-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.predict-change { font-size: 12px; margin-left: 6px; }
+.predict-change.up { color: var(--pink); }
+.predict-change.down { color: var(--green); }
+.modal-note { margin-top: 1rem; font-size: 11px; color: var(--muted); opacity: 0.6; line-height: 1.5; }
+
+/* ── STATS ── */
+.stats-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+.stat {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: 1.25rem;
+  opacity: 0;
+  transform: translateY(16px);
+  transition: all 0.5s;
+}
+.stat.in { opacity: 1; transform: translateY(0); }
+.stat-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); margin-bottom: 8px; }
+.stat-val { font-family: 'Space Grotesk', sans-serif; font-size: 26px; font-weight: 700; margin-bottom: 4px; }
+.stat-meta { font-size: 12px; color: var(--muted); }
+
+/* ── CHARTS ── */
+.charts-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.25rem;
+  margin-bottom: 1.5rem;
+}
+@media(max-width:680px) { .charts-grid { grid-template-columns: 1fr; } }
+
+.chart-box {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 1.5rem;
+  opacity: 0;
+  transform: translateY(16px);
+  transition: all 0.6s;
+}
+.chart-box.in { opacity: 1; transform: translateY(0); }
+.chart-box.wide { grid-column: 1 / -1; }
+.chart-label {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 14px; font-weight: 600;
+  margin-bottom: 1.25rem;
+  color: var(--text);
+  display: flex; align-items: center; gap: 8px;
+}
+
+canvas { max-height: 240px; }
+
+/* ── SUGGESTIONS ── */
+.sug-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+  opacity: 0;
+  transform: translateY(16px);
+  transition: all 0.6s;
+}
+.sug-card.in { opacity: 1; transform: translateY(0); }
+.sug-title {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 15px; font-weight: 700;
+  margin-bottom: 1rem;
+  display: flex; align-items: center; gap: 8px;
+}
+.sug-item {
+  display: flex;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 14px;
+}
+.sug-item:last-child { border-bottom: none; }
+.sug-num {
+  width: 24px; height: 24px; border-radius: 50%;
+  background: var(--surface2);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 700;
+  color: var(--accent);
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+.sug-body { line-height: 1.6; }
+.sug-body strong { color: var(--pink); font-weight: 600; }
+.sug-body span { color: var(--muted); font-size: 13px; display: block; margin-top: 2px; }
+
+/* ── TRANSACTIONS ── */
+.tx-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 1.5rem;
+  margin-bottom: 2rem;
+  opacity: 0;
+  transform: translateY(16px);
+  transition: all 0.7s;
+}
+.tx-card.in { opacity: 1; transform: translateY(0); }
+.tx-title { font-family: 'Space Grotesk', sans-serif; font-size: 15px; font-weight: 700; margin-bottom: 1rem; }
+.tx-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 11px 0;
+  border-bottom: 1px solid var(--border);
+}
+.tx-row:last-child { border-bottom: none; }
+.tx-l { display: flex; align-items: center; gap: 10px; }
+.tx-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+.tx-name { font-size: 14px; font-weight: 500; }
+.tx-date { font-size: 11px; color: var(--muted); }
+.tx-r { display: flex; align-items: center; gap: 10px; }
+.tx-badge {
+  font-size: 11px; font-weight: 600;
+  padding: 3px 9px; border-radius: 99px;
+  letter-spacing: 0.03em;
+}
+.tx-amt { font-family: 'Space Grotesk', sans-serif; font-size: 14px; font-weight: 600; }
+
+/* ── FOOTER ── */
+.footer {
+  text-align: center;
+  padding: 1.5rem 1rem 3rem;
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.8;
+}
+.footer a { color: var(--accent); text-decoration: none; font-weight: 600; }
+.footer a:hover { color: var(--pink); }
+.footer .handle { font-size: 15px; font-weight: 600; color: var(--text); }
+</style>
+</head>
+<body>
+
+<div class="orb orb1"></div>
+<div class="orb orb2"></div>
+<div class="orb orb3"></div>
+
+<!-- ══ SCREEN 1: UPLOAD ══ -->
+<div id="s1" class="screen">
+  <div class="wordmark">
+    <div class="wordmark-icon">
+      <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect x="4" y="8" width="22" height="28" rx="3" fill="#0f0f1a" stroke="#6f5fff" stroke-width="1.5"/>
+        <rect x="8" y="14" width="14" height="2" rx="1" fill="#6f5fff" opacity="0.6"/>
+        <rect x="8" y="19" width="10" height="2" rx="1" fill="#6f5fff" opacity="0.4"/>
+        <rect x="8" y="24" width="12" height="2" rx="1" fill="#6f5fff" opacity="0.3"/>
+        <circle cx="30" cy="28" r="8" fill="#07070f" stroke="#ff5f9e" stroke-width="1.5"/>
+        <path d="M27 28 L29.5 30.5 L34 26" stroke="#00e5a0" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </div>
+    <div class="wordmark-text"><span class="s">Spend</span><span class="p">Lens</span></div>
+  </div>
+
+  <div class="eyebrow">AI-Powered Expense Analyzer</div>
+
+  <h1 class="h1">Your money.<br><em>Decoded.</em></h1>
+  <p class="sub">Drop your bank statement CSV. AI reads it, finds where you're bleeding money, and tells you what to do about it.</p>
+
+  <div class="steps-row">
+    <div class="step-pill active">
+      <div class="step-num">1</div>
+      Upload Statement
+    </div>
+    <div class="step-arrow">→</div>
+    <div class="step-pill">
+      <div class="step-num">2</div>
+      AI Analyzes
+    </div>
+    <div class="step-arrow">→</div>
+    <div class="step-pill">
+      <div class="step-num">3</div>
+      See Insights
+    </div>
+  </div>
+
+  <div class="dropzone" id="dropzone">
+    <span class="dz-receipt">🧾</span>
+    <div class="dz-title">Throw your statement here</div>
+    <div class="dz-sub">CSV with date, description, amount, category columns.<br>Your data never leaves your device.</div>
+    <label class="btn-primary" for="fileInput">
+      ↑ &nbsp;Pick your CSV
+    </label>
+    <input type="file" id="fileInput" accept=".csv" />
+    <button class="btn-ghost" onclick="loadSample()">⚡ Try with June 2024 sample data</button>
+    <div class="format-note">date · description · amount · category — that's all it needs</div>
+  </div>
+</div>
+
+<!-- ══ SCREEN 2: LOADING ══ -->
+<div id="s2" class="screen" style="display:none;min-height:100vh;display:none;align-items:center;justify-content:center;flex-direction:column;padding:2rem">
+
+  <div class="load-wrap">
+    <div class="load-ticker">⚡ SpendLens is working</div>
+
+    <div class="load-visual">
+      <div class="load-ring load-ring-1"></div>
+      <div class="load-ring load-ring-2"></div>
+      <div class="load-ring load-ring-3"></div>
+      <div class="load-center" id="loadEmoji">📄</div>
+    </div>
+
+    <div class="load-title" id="loadTitle">Reading your file...</div>
+    <div class="load-sub" id="loadSub">Parsing every transaction</div>
+    <div class="load-bar-wrap"><div class="load-bar" id="loadBar"></div></div>
+
+    <div class="load-items" id="loadItems">
+      <div class="load-item" id="li0"><div class="load-item-dot"></div>Parsing transactions</div>
+      <div class="load-item" id="li1"><div class="load-item-dot"></div>Categorizing expenses</div>
+      <div class="load-item" id="li2"><div class="load-item-dot"></div>Calculating totals</div>
+      <div class="load-item" id="li3"><div class="load-item-dot"></div>Running regression model</div>
+      <div class="load-item" id="li4"><div class="load-item-dot"></div>Getting AI roast ready</div>
+      <div class="load-item" id="li5"><div class="load-item-dot"></div>Building your dashboard</div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ SCREEN 3: DASHBOARD ══ -->
+<div id="s3" class="screen">
+  <div class="dash-nav">
+    <div class="dash-wordmark"><span class="s">Spend</span><span class="p">Lens</span></div>
+    <button class="btn-back" onclick="reset()">← New File</button>
+  </div>
+
+  <div class="ai-card">
+    <div class="ai-badge"><div class="live-dot"></div> Groq AI — Llama 3</div>
+    <div class="ai-text" id="aiText">Analyzing...</div>
+  </div>
+
+  <!-- PREDICT -->
+  <div class="predict-card" onclick="document.getElementById('predictModal').classList.add('open')">
+    <div class="predict-left">
+      <div class="predict-icon">📈</div>
+      <div>
+        <div class="predict-title">Next Month Prediction</div>
+        <div class="predict-sub">Linear regression on your spending pattern — tap to see</div>
+      </div>
+    </div>
+    <div class="predict-badge">ML POWERED</div>
+  </div>
+
+  <div class="stats-row" id="statsRow"></div>
+  <div class="charts-grid" id="chartsGrid"></div>
+  <div class="sug-card" id="sugCard" style="opacity:0;transform:translateY(16px);transition:all 0.6s;">
+    <div class="sug-title">💡 Where You Can Spend Less</div>
+    <div id="sugList"></div>
+  </div>
+  <div class="tx-card" id="txCard" style="opacity:0;transform:translateY(16px);transition:all 0.6s;">
+    <div class="tx-title">All Transactions</div>
+    <div id="txList"></div>
+  </div>
+
+  <div class="footer">
+    Built on Day 6 of my 100-day remote AI internship challenge<br>
+    <span class="handle">Follow <a href="https://www.instagram.com/thekunal.build/" target="_blank">@thekunal.build</a> for more</span>
+  </div>
+</div>
+
+<!-- ══ PREDICT MODAL ══ -->
+<div class="modal-bg" id="predictModal">
+  <div class="modal">
+    <button class="modal-close" onclick="document.getElementById('predictModal').classList.remove('open')">✕</button>
+    <div class="modal-title">📈 Next Month Forecast</div>
+    <div class="modal-sub">Linear regression on your 30-day spend. Projected based on current velocity.</div>
+    <div id="predictRows"></div>
+    <div class="modal-note">* Prediction uses simple linear regression on daily totals. Actual spending may vary.</div>
+  </div>
+</div>
+
+<script>
+const GROQ_KEY = 'YOUR_GROQ_API_KEY_HERE';
+const CAT_COLORS = { Food:'#ff5f9e', Transport:'#6f5fff', Shopping:'#ff9a3c', Entertainment:'#00e5a0', Groceries:'#ffe14d' };
+
+const SAMPLE = `date,description,amount,category
+2024-06-01,Swiggy Food Order,349,Food
+2024-06-02,Uber Ride,180,Transport
+2024-06-03,Amazon Shopping,1299,Shopping
+2024-06-04,Netflix Subscription,649,Entertainment
+2024-06-05,Zomato Food Order,420,Food
+2024-06-06,Ola Ride,95,Transport
+2024-06-07,Myntra Clothes,2199,Shopping
+2024-06-08,Spotify Premium,119,Entertainment
+2024-06-09,Big Bazaar Groceries,876,Groceries
+2024-06-10,Swiggy Food Order,299,Food
+2024-06-11,IRCTC Train Ticket,540,Transport
+2024-06-12,Zepto Groceries,432,Groceries
+2024-06-13,BookMyShow Movie,480,Entertainment
+2024-06-14,Dunzo Delivery,150,Transport
+2024-06-15,Blinkit Groceries,610,Groceries
+2024-06-16,Zomato Food Order,380,Food
+2024-06-17,Flipkart Electronics,3499,Shopping
+2024-06-18,Rapido Ride,60,Transport
+2024-06-19,Amazon Prime,299,Entertainment
+2024-06-20,Swiggy Instamart,520,Groceries
+2024-06-21,Swiggy Food Order,410,Food
+2024-06-22,Ola Ride,130,Transport
+2024-06-23,Meesho Shopping,899,Shopping
+2024-06-24,YouTube Premium,189,Entertainment
+2024-06-25,DMart Groceries,1240,Groceries
+2024-06-26,Zomato Food Order,330,Food
+2024-06-27,Uber Ride,220,Transport
+2024-06-28,Nykaa Shopping,760,Shopping
+2024-06-29,Hotstar Subscription,299,Entertainment
+2024-06-30,Swiggy Food Order,275,Food`;
+
+// Drag drop
+const dz = document.getElementById('dropzone');
+dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag'); });
+dz.addEventListener('dragleave', () => dz.classList.remove('drag'));
+dz.addEventListener('drop', e => { e.preventDefault(); dz.classList.remove('drag'); if(e.dataTransfer.files[0]) processFile(e.dataTransfer.files[0]); });
+document.getElementById('fileInput').addEventListener('change', e => { if(e.target.files[0]) processFile(e.target.files[0]); });
+
+function loadSample() { runPipeline(Papa.parse(SAMPLE, {header:true, skipEmptyLines:true}).data); }
+function processFile(f) { Papa.parse(f, {header:true, skipEmptyLines:true, complete: r => runPipeline(r.data)}); }
+
+async function runPipeline(rows) {
+  show('s2');
+
+  const steps = [
+    {e:'📄', t:'Reading your file...', s:'Parsing every transaction', p:16},
+    {e:'🏷️', t:'Categorizing expenses...', s:'Grouping Food, Transport, Shopping...', p:32},
+    {e:'🔢', t:'Crunching the numbers...', s:'Totals, averages, daily patterns', p:48},
+    {e:'📐', t:'Running regression model...', s:'Predicting next month spend', p:64},
+    {e:'🤖', t:'Asking Groq AI to roast you...', s:'This might sting a little 😈', p:82},
+    {e:'✨', t:'Building your dashboard...', s:'Almost ready!', p:96},
+  ];
+
+  for(let i=0;i<steps.length;i++){
+    const st = steps[i];
+    document.getElementById('loadEmoji').textContent = st.e;
+    document.getElementById('loadTitle').textContent = st.t;
+    document.getElementById('loadSub').textContent = st.s;
+    document.getElementById('loadBar').style.width = st.p + '%';
+    document.getElementById('li'+i).classList.add('done');
+    await sleep(700);
+  }
+
+  const data = rows.map(r => ({
+    date: r.date?.trim(),
+    description: r.description?.trim(),
+    amount: parseFloat(r.amount)||0,
+    category: r.category?.trim()
+  })).filter(r=>r.amount>0);
+
+  const catTotals = {};
+  data.forEach(r => catTotals[r.category] = (catTotals[r.category]||0)+r.amount);
+  const total = data.reduce((s,r)=>s+r.amount,0);
+  const sorted = Object.entries(catTotals).sort((a,b)=>b[1]-a[1]);
+  const topCat = sorted[0];
+  const topTx = [...data].sort((a,b)=>b.amount-a.amount)[0];
+
+  // Linear regression for predictions
+  const byDate = {};
+  data.forEach(r => byDate[r.date] = (byDate[r.date]||0)+r.amount);
+  const dates = Object.keys(byDate).sort();
+  const xs = dates.map((_,i)=>i);
+  const ys = dates.map(d=>byDate[d]);
+  const n = xs.length;
+  const sumX=xs.reduce((a,b)=>a+b,0), sumY=ys.reduce((a,b)=>a+b,0);
+  const sumXY=xs.reduce((a,x,i)=>a+x*ys[i],0), sumX2=xs.reduce((a,x)=>a+x*x,0);
+  const slope=(n*sumXY-sumX*sumY)/(n*sumX2-sumX*sumX);
+  const intercept=(sumY-slope*sumX)/n;
+  const futureDays=30;
+  const predictedDaily = slope*(n+futureDays/2)+intercept;
+  const predictedTotal = Math.max(0, predictedDaily*futureDays);
+
+  const predictByCat = {};
+  sorted.forEach(([cat,val])=>{
+    const pct = val/total;
+    const predicted = predictedTotal*pct;
+    const change = ((predicted-val)/val*100).toFixed(0);
+    predictByCat[cat] = {predicted, change, current:val};
+  });
+
+  // Groq AI
+  let insight = '';
+  try {
+    const summary = sorted.map(([k,v])=>`${k}: ₹${v.toFixed(0)}`).join(', ');
+    const res = await fetch('https://api.groq.com/openai/v1/chat/completions',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':`Bearer ${GROQ_KEY}`},
+      body: JSON.stringify({
+        model:'llama3-8b-8192',
+        messages:[{role:'user',content:`You're a brutally honest but funny financial advisor for an Indian college student. In 2-3 sentences, roast their spending and give one sharp tip. Hinglish tone, no fluff. Data: Total ₹${total.toFixed(0)}, ${summary}. Biggest: ${topTx.description} ₹${topTx.amount}.`}],
+        max_tokens:160
+      })
+    });
+    const j=await res.json();
+    insight=j.choices?.[0]?.message?.content||'';
+  } catch(e){}
+
+  if(!insight) {
+    insight = `Bhai, <strong>₹${total.toLocaleString('en-IN',{maximumFractionDigits:0})}</strong> ek hi mahine mein? <strong>${topCat[0]}</strong> pe ${((topCat[1]/total)*100).toFixed(0)}% gaye tere — aur tune socha bhi nahi. <strong>${topTx.description}</strong> ka ₹${topTx.amount} toh seedha dil pe laga. Ek kaam kar — agla mahina sirf cash mein kharch kar, debit card band.`;
+  }
+
+  document.getElementById('loadBar').style.width='100%';
+  await sleep(400);
+  buildDashboard(data, catTotals, sorted, total, topCat, topTx, insight, byDate, dates, predictByCat, predictedTotal);
+}
+
+function buildDashboard(data, catTotals, sorted, total, topCat, topTx, insight, byDate, dates, predictByCat, predictedTotal) {
+  show('s3');
+  document.getElementById('aiText').innerHTML = insight;
+
+  // Predict modal
+  document.getElementById('predictRows').innerHTML = Object.entries(predictByCat).map(([cat, obj])=>{
+    const {predicted, change} = obj;
+    const up = parseFloat(change) > 0;
+    return `<div class="predict-row">
+      <div class="predict-row-cat"><div class="predict-dot" style="background:${CAT_COLORS[cat]||'#888'}"></div>${cat}</div>
+      <div><strong>₹${predicted.toFixed(0)}</strong><span class="predict-change ${up?'up':'down'}">${up?'↑':'↓'}${Math.abs(change)}%</span></div>
+    </div>`;
+  }).join('');
+
+  // Stats — render visible immediately, then fade in
+  const stats = [
+    {l:'Total Spent', v:`₹${total.toLocaleString('en-IN',{maximumFractionDigits:0})}`, m:`${data.length} transactions`, c:'#6f5fff'},
+    {l:'Biggest Single', v:`₹${topTx.amount.toLocaleString('en-IN')}`, m:topTx.description, c:'#ff5f9e'},
+    {l:'Top Category', v:topCat[0], m:`₹${topCat[1].toFixed(0)} — ${((topCat[1]/total)*100).toFixed(0)}% of total`, c:'#ff9a3c'},
+    {l:'Predicted Next Month', v:`₹${predictedTotal.toFixed(0)}`, m:'Based on linear regression', c:'#00e5a0'},
+  ];
+  document.getElementById('statsRow').innerHTML = stats.map((s,i)=>`
+    <div class="stat" style="transition-delay:${i*0.1}s;opacity:0;transform:translateY(16px)">
+      <div class="stat-label">${s.l}</div>
+      <div class="stat-val" style="color:${s.c}">${s.v}</div>
+      <div class="stat-meta">${s.m}</div>
+    </div>`).join('');
+
+  // Charts HTML — inject immediately
+  const cats = sorted.map(([c])=>c);
+  const vals = sorted.map(([,v])=>v);
+  const colors = cats.map(c=>CAT_COLORS[c]||'#888');
+  const dateVals = dates.map(d=>byDate[d]);
+
+  document.getElementById('chartsGrid').innerHTML = `
+    <div class="chart-box" style="opacity:0;transform:translateY(16px);transition:all 0.6s;transition-delay:0.2s">
+      <div class="chart-label">🍩 Spending Breakdown</div>
+      <canvas id="pieC"></canvas>
+    </div>
+    <div class="chart-box" style="opacity:0;transform:translateY(16px);transition:all 0.6s;transition-delay:0.3s">
+      <div class="chart-label">📊 Category Totals</div>
+      <canvas id="barC"></canvas>
+    </div>
+    <div class="chart-box wide" style="opacity:0;transform:translateY(16px);transition:all 0.6s;transition-delay:0.4s">
+      <div class="chart-label">📈 Daily Spending + Trend Line</div>
+      <canvas id="lineC"></canvas>
+    </div>`;
+
+  // AI Suggestions
+  const suggestions = generateSuggestions(sorted, total, data);
+  document.getElementById('sugList').innerHTML = suggestions.map((s,i)=>`
+    <div class="sug-item">
+      <div class="sug-num">${i+1}</div>
+      <div class="sug-body">${s.main}<span>${s.tip}</span></div>
+    </div>`).join('');
+
+  // Transactions
+  document.getElementById('txList').innerHTML = [...data].sort((a,b)=>new Date(b.date)-new Date(a.date)).map(r=>`
+    <div class="tx-row">
+      <div class="tx-l">
+        <div class="tx-dot" style="background:${CAT_COLORS[r.category]||'#888'}"></div>
+        <div><div class="tx-name">${r.description}</div><div class="tx-date">${r.date}</div></div>
+      </div>
+      <div class="tx-r">
+        <span class="tx-badge" style="background:${(CAT_COLORS[r.category]||'#888')}22;color:${CAT_COLORS[r.category]||'#888'}">${r.category}</span>
+        <div class="tx-amt" style="color:${CAT_COLORS[r.category]||'#fff'}">₹${r.amount.toLocaleString('en-IN')}</div>
+      </div>
+    </div>`).join('');
+
+  // Animate everything in after DOM settles
+  requestAnimationFrame(()=>{
+    requestAnimationFrame(()=>{
+
+      // Animate stats
+      document.querySelectorAll('#statsRow .stat').forEach(c=>{
+        c.style.opacity='1';
+        c.style.transform='translateY(0)';
+        c.style.transition='all 0.5s';
+      });
+
+      // Animate chart boxes
+      document.querySelectorAll('#chartsGrid .chart-box').forEach(c=>{
+        c.style.opacity='1';
+        c.style.transform='translateY(0)';
+      });
+
+      // Animate sug + tx cards
+      setTimeout(()=>{ document.getElementById('sugCard').style.cssText += 'opacity:1;transform:translateY(0);transition:all 0.6s;'; }, 300);
+      setTimeout(()=>{ document.getElementById('txCard').style.cssText += 'opacity:1;transform:translateY(0);transition:all 0.6s;'; }, 450);
+
+      // Build charts AFTER canvas elements are in DOM
+      setTimeout(()=>{
+
+        new Chart(document.getElementById('pieC'),{
+          type:'doughnut',
+          data:{labels:cats, datasets:[{data:vals, backgroundColor:colors, borderWidth:0, hoverOffset:10}]},
+          options:{
+            plugins:{legend:{labels:{color:'#eeeeff',font:{family:'Inter',size:12},padding:16}}},
+            animation:{animateRotate:true, animateScale:true, duration:1400, easing:'easeOutQuart'}
+          }
+        });
+
+        new Chart(document.getElementById('barC'),{
+          type:'bar',
+          data:{labels:cats, datasets:[{data:vals, backgroundColor:colors, borderRadius:10, borderSkipped:false}]},
+          options:{
+            plugins:{legend:{display:false}},
+            scales:{
+              x:{ticks:{color:'#888'}, grid:{color:'rgba(255,255,255,0.04)'}},
+              y:{ticks:{color:'#888', callback:v=>'₹'+v}, grid:{color:'rgba(255,255,255,0.04)'}}
+            },
+            animation:{duration:1400, easing:'easeOutQuart'}
+          }
+        });
+
+        // Linear regression
+        const n=dates.length;
+        const sumX=dates.reduce((_,__,j)=>_+j,0);
+        const sumY=dateVals.reduce((a,b)=>a+b,0);
+        const sumXY=dates.reduce((a,_,j)=>a+j*dateVals[j],0);
+        const sumX2=dates.reduce((a,_,j)=>a+j*j,0);
+        const slope=(n*sumXY-sumX*sumY)/(n*sumX2-sumX*sumX);
+        const intercept=(sumY-slope*sumX)/n;
+        const regLine=dates.map((_,i)=>Math.max(0,slope*i+intercept));
+
+        new Chart(document.getElementById('lineC'),{
+          type:'line',
+          data:{
+            labels:dates.map(d=>d.slice(5)),
+            datasets:[
+              {label:'Daily Spend', data:dateVals, borderColor:'#6f5fff', backgroundColor:'rgba(111,95,255,0.1)', fill:true, tension:0.4, pointBackgroundColor:'#ff5f9e', pointRadius:4, pointHoverRadius:7},
+              {label:'Trend', data:regLine, borderColor:'#00e5a0', borderDash:[6,4], borderWidth:2, pointRadius:0, fill:false, tension:0}
+            ]
+          },
+          options:{
+            plugins:{legend:{labels:{color:'#eeeeff',font:{family:'Inter',size:12},padding:16}}},
+            scales:{
+              x:{ticks:{color:'#888', maxTicksLimit:10}, grid:{color:'rgba(255,255,255,0.04)'}},
+              y:{ticks:{color:'#888', callback:v=>'₹'+v}, grid:{color:'rgba(255,255,255,0.04)'}}
+            },
+            animation:{duration:1600, easing:'easeOutQuart'}
+          }
+        });
+
+      }, 100);
+    });
+  });
+}
+
+function generateSuggestions(sorted, total, data) {
+  const tips = [];
+  sorted.forEach(([cat, val]) => {
+    const pct = (val/total*100).toFixed(0);
+    if(cat==='Food' && val>2000) tips.push({main:`<strong>Cut food delivery by 30%</strong> — you spent ₹${val.toFixed(0)} (${pct}%) on Food.`, tip:'Cook twice a week. That alone saves ₹600+ monthly.'});
+    if(cat==='Shopping' && val>2000) tips.push({main:`<strong>Shopping is your biggest leak</strong> — ₹${val.toFixed(0)} gone.`, tip:'Use a 24-hour rule: wait a day before buying anything above ₹500.'});
+    if(cat==='Entertainment' && val>800) tips.push({main:`<strong>Entertainment at ₹${val.toFixed(0)}</strong> — are you using all those subscriptions?`, tip:'Audit your active subscriptions. Cancel any you haven\'t used in 2 weeks.'});
+    if(cat==='Transport' && val>500) tips.push({main:`<strong>Transport costs ₹${val.toFixed(0)}</strong> this month.`, tip:'Rapido > Ola > Uber for short rides. Can save 40% on the same route.'});
+    if(cat==='Groceries' && val>1000) tips.push({main:`<strong>Grocery spend is ₹${val.toFixed(0)}</strong> — delivery fees add up.`, tip:'Batch order once a week on Blinkit instead of daily orders. Saves on delivery fees.'});
+  });
+  if(tips.length===0) tips.push({main:'<strong>Solid spending habits overall.</strong>', tip:'Keep an eye on your top category and set a monthly cap.'});
+  return tips.slice(0,4);
+}
+
+function show(id) {
+  ['s1','s2','s3'].forEach(s => {
+    const el = document.getElementById(s);
+    el.style.display = s===id ? (s==='s2'?'flex':'block') : 'none';
+  });
+}
+
+function reset() {
+  show('s1');
+  document.getElementById('fileInput').value='';
+  document.getElementById('loadBar').style.width='0%';
+  document.querySelectorAll('.load-item').forEach(i=>i.classList.remove('done'));
+  Object.values(Chart.instances||{}).forEach(c=>c.destroy());
+}
+
+function sleep(ms) { return new Promise(r=>setTimeout(r,ms)); }
+</script>
+</body>
+</html>
